@@ -10,9 +10,13 @@ pipeline {
     // use credentials to set DOCKER_HUB_USR and DOCKER_HUB_PSW
     DOCKER_HUB = credentials("${HUB_CREDENTIAL}")
     
-    // user/pass/url for anchore-cli
-    ANCHORE_CLI_USER = "demo-user"
-    ANCHORE_CLI_PASS = "foobar"
+    // we'll need the anchore credential to pass the user
+    // and password to syft so it can upload the results
+    ANCHORE_CREDENTIAL = "AnchoreJenkinsUser"
+    // use credentials to set ANCHORE_USR and ANCHORE_PSW
+    ANCHORE = credentials("${ANCHORE_CREDENTIAL}")
+    
+    // url for anchore-cli
     ANCHORE_CLI_URL = "http://anchore-priv.novarese.net:8228/v1/"
     
     // use credentials to set JIRA_USR and JIRA_PSW
@@ -21,6 +25,7 @@ pipeline {
     JIRA_URL = "anchore8.atlassian.net"
     
     JIRA_PROJECT = "10000"
+    JIRA_ISSUETYPE = "10002"
     JIRA_ASSIGNEE = "5fc52f03f2df6c0076c94c94"
     
     // change repository to your DockerID
@@ -65,10 +70,10 @@ pipeline {
         //
         sh """
           echo "scanning ${REPOSITORY}:${TAG}"
-          anchore-cli image add ${REPOSITORY}${TAG}
-          anchore-cli image wait ${REPOSITORY}${TAG}
-          anchore-cli --json evaluate check --detail ${REPOSITORY}${TAG} | \
-            jq .[] | jq .[] | jq .[] | 
+          anchore-cli --url ${ANCHORE_CLI_URL} --u ${ANCHORE_USR} --p ${ANCHORE_PSW} image add ${REPOSITORY}${TAG}
+          anchore-cli --url ${ANCHORE_CLI_URL} --u ${ANCHORE_USR} --p ${ANCHORE_PSW} image wait ${REPOSITORY}${TAG}
+          anchore-cli --url ${ANCHORE_CLI_URL} --u ${ANCHORE_USR} --p ${ANCHORE_PSW} --json evaluate check --detail ${REPOSITORY}${TAG} | \
+            jq .[] | jq .[] | jq .[] | \
             jq '.[].detail.result | select ((.final_action=="stop") and (.final_action_reason=="policy_evaluation")) | .result' | \
             jq -r '.[].result?.rows[] | select (.[6]=="stop" and .[7]==false) | [.[2], .[5]]|@tsv ' > jira_body.txt   
         """
@@ -85,7 +90,7 @@ pipeline {
           if (DESC_BODY_LINES != '0') {
             sh """
               # build json for jira API
-              echo '{ "fields": { "project": { "id": "${JIRA_PROJECT}" }, "issuetype": { "id": "10002" }, "summary": "Anchore detected policy violations", "reporter": { "id": "${JIRA_ASSIGNEE}" }, "labels": [ "anchore" ], "assignee": { "id": "${JIRA_ASSIGNEE}" }, "description": "' | head -c -1 > jira_header.txt
+              echo '{ "fields": { "project": { "id": "${JIRA_PROJECT}" }, "issuetype": { "id": "${JIRA_ISSUETYPE}" }, "summary": "Anchore detected policy violations", "reporter": { "id": "${JIRA_ASSIGNEE}" }, "labels": [ "anchore" ], "assignee": { "id": "${JIRA_ASSIGNEE}" }, "description": "' | head -c -1 > jira_header.txt
               echo '${REPOSITORY}${TAG} has STOP action policy violations:' >> jira_header.txt
               echo >> jira_header.txt
               cat jira_header.txt jira_body.txt | sed -e :a -e '\$!N;s/\\n/\\\\n/;ta' | tr '\\t' '  ' | tr -d '\\\n' > v2_create_issue.json  # escape newlines, convert tabs to spaces, remove any remaining newlines
