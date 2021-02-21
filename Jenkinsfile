@@ -24,7 +24,7 @@ pipeline {
     JIRA_ASSIGNEE = "5fc52f03f2df6c0076c94c94"
     
     // change repository to your DockerID
-    REPOSITORY = "${DOCKER_HUB_USR}/jenkins-anchore-jira"
+    REPOSITORY = "${DOCKER_HUB_USR}/jenkins-anchore-jira-policy"
     TAG = ":devbuild-${BUILD_NUMBER}"   
     
     // set path for executables.  I put these in jenkins_home as noted
@@ -61,15 +61,20 @@ pipeline {
         // artifact name (i.e. package name) and version to upgrade to.
         // sh "${GRYPE_LOCATION} -o json ${REPOSITORY}${TAG} | jq -r '.matches[] | select(.vulnerability.fixedInVersion | . != null ) | [.artifact.name, .vulnerability.id, .vulnerability.severity, .vulnerability.fixedInVersion]|@tsv' > jira_body.txt"
         
-        // use plugin to analyze image (or we could use syft pipeline scanning mode
-        // then pull vunlerabilities with anchore-cli (we could alternatively pull
-        // policy violations instead), build payload to open a jira ticket to fix
-        // any problems
+        // anlayze image, get the evaluation, and parse it for stop actions
+        // we will only open tickets for images that have final action = "stop
+        // AND reason = "policy evaluation" (i.e. we won't open a ticket if the 
+        // image fails because it's on a image blocklist)
+        // we then select the policy actions that have a "stop" gate action AND
+        // are not whitelisted, then output the trigger ID and check output.
         sh """
           echo "scanning ${REPOSITORY}:${TAG}"
           anchore-cli image add ${REPOSITORY}${TAG}
           anchore-cli image wait ${REPOSITORY}${TAG}
-          anchore-cli --json image vuln ${REPOSITORY}${TAG} all | jq -r '.vulnerabilities[] | select(.fix | . != "None") | [.package, .vuln, .severity, .fix]|@tsv' > jira_body.txt
+          anchore-cli --json evaluate check --detail ${REPOSITORY}${TAG} | \
+            jq .[] | jq .[] | jq .[] | 
+            jq '.[].detail.result | select ((.final_action=="stop") and (.final_action_reason=="policy_evaluation")) | .result' | \
+            jq -r '.[].result?.rows[] | select (.[6]=="stop" and .[7]==false) | [.[2], .[5]]|@tsv ' > jira_body.txt   
         """
       } // end steps
     } // end stage "analyze"
