@@ -1,6 +1,6 @@
-# Demo: Integrating Anchore, Jenkins, and Jira
+# Demo: Integrating Anchore, Jenkins, and Jira (for Policy Violations)
 
-This is a very rough demo of integrating Jenkins, Anchore, and Jira.  
+This is a very rough demo of integrating Jenkins, Anchore, and Jira.  This repo will open Jira tickets for violations of policy detected by Anchore Enterprise in the images we build and scan.
 
 ## Part 1: Jenkins Setup
 
