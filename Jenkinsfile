@@ -30,7 +30,8 @@ pipeline {
     
     // change repository to your DockerID
     REPOSITORY = "${DOCKER_HUB_USR}/jenkins-anchore-jira-policy"
-    TAG = ":devbuild-${BUILD_NUMBER}"   
+    //TAG = ":devbuild-${BUILD_NUMBER}"   
+    TAG = ":scratch1"
     
     // set path for executables.  I put these in jenkins_home as noted
     // in README but you may install it somewhere else like /usr/local/bin
@@ -47,16 +48,16 @@ pipeline {
       } // end steps
     } // end stage "checkout scm"
     
-    stage('Build image and tag with build number') {
-      steps {
-        script {
-          dockerImage = docker.build REPOSITORY + TAG
-          docker.withRegistry( '', HUB_CREDENTIAL ) { 
-            dockerImage.push() 
-          }
-        } // end script
-      } // end steps      
-    } // end stage "build image and tag w build number"
+    //stage('Build image and tag with build number') {
+    //  steps {
+    //    script {
+    //      dockerImage = docker.build REPOSITORY + TAG
+    //      docker.withRegistry( '', HUB_CREDENTIAL ) { 
+    //        dockerImage.push() 
+    //      }
+    //    } // end script
+    //  } // end steps      
+    //} // end stage "build image and tag w build number"
     
     stage('Analyze with Anchore') {
       steps {
@@ -71,9 +72,9 @@ pipeline {
         sh """
           echo "scanning ${REPOSITORY}:${TAG}"
           ## queue image for analysis
-          anchore-cli --url ${ANCHORE_CLI_URL} --u ${ANCHORE_USR} --p ${ANCHORE_PSW} image add ${REPOSITORY}${TAG}
+          ##anchore-cli --url ${ANCHORE_CLI_URL} --u ${ANCHORE_USR} --p ${ANCHORE_PSW} image add ${REPOSITORY}${TAG}
           ## wait for analysis to complete
-          anchore-cli --url ${ANCHORE_CLI_URL} --u ${ANCHORE_USR} --p ${ANCHORE_PSW} image wait ${REPOSITORY}${TAG}
+          ##anchore-cli --url ${ANCHORE_CLI_URL} --u ${ANCHORE_USR} --p ${ANCHORE_PSW} image wait ${REPOSITORY}${TAG}
           ## get the evaluation and wash it through jq.
           anchore-cli --url ${ANCHORE_CLI_URL} --u ${ANCHORE_USR} --p ${ANCHORE_PSW} --json evaluate check --detail ${REPOSITORY}${TAG} | \
             jq '.[keys_unsorted[0]] | .[keys_unsorted[0]] | .[keys_unsorted[0]] | .[].detail.result | 
