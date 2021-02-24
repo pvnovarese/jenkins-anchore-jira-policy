@@ -142,7 +142,10 @@ pipeline {
     stage('Clean up') {
       // delete the images locally
       steps {
-        sh 'docker rmi ${REPOSITORY}${TAG}'
+        sh """
+          docker rmi ${REPOSITORY}${TAG}
+          rm jira_body.txt
+        """
         // ${REPOSITORY}:prod'
       } // end steps
     } // end stage "clean up"
