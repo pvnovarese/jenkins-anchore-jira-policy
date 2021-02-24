@@ -77,7 +77,7 @@ pipeline {
           ##anchore-cli --url ${ANCHORE_CLI_URL} --u ${ANCHORE_USR} --p ${ANCHORE_PSW} image wait ${REPOSITORY}${TAG}
           ## get the evaluation and wash it through jq.
           anchore-cli --url ${ANCHORE_CLI_URL} --u ${ANCHORE_USR} --p ${ANCHORE_PSW} --json evaluate check --detail ${REPOSITORY}${TAG} | \
-            jq '.[keys_unsorted[0]] | .[keys_unsorted[0]] | .[keys_unsorted[0]] | .[].detail.result | 
+            jq -r '.[keys_unsorted[0]] | .[keys_unsorted[0]] | .[keys_unsorted[0]] | .[].detail.result | 
             select ((.final_action=="stop") and (.final_action_reason=="policy_evaluation")) | .result[].result?.rows[] | 
             select (.[6]=="stop") | [.[2], .[5]] | @tsv' > jira_body.txt
             ##
