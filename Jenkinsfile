@@ -144,7 +144,6 @@ pipeline {
       steps {
         sh """
           docker rmi ${REPOSITORY}${TAG}
-          rm jira_body.txt
         """
         // ${REPOSITORY}:prod'
       } // end steps
