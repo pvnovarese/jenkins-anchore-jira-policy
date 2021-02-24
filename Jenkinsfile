@@ -108,6 +108,12 @@ pipeline {
      stage('Open Jira Ticket if Needed') {
       steps {       
         script {
+          //
+          // this groovy script checks the number of lines in xxx_jira_body.txt, and 
+          // if it's not zero, then it opens a jira ticket.  I'm not sure why I did it
+          // this way, it would make more sense to just put the wc -l and the if/then
+          // logic in the main shell section with the rest of it but here we are.
+          //
           DESC_BODY_LINES = sh (
             script: 'cat xxx_jira_body.txt | wc -l',
             returnStdout: true
