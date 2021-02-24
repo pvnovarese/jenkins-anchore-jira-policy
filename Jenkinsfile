@@ -70,12 +70,31 @@ pipeline {
         //
         sh """
           echo "scanning ${REPOSITORY}:${TAG}"
+          ## queue image for analysis
           anchore-cli --url ${ANCHORE_CLI_URL} --u ${ANCHORE_USR} --p ${ANCHORE_PSW} image add ${REPOSITORY}${TAG}
+          ## wait for analysis to complete
           anchore-cli --url ${ANCHORE_CLI_URL} --u ${ANCHORE_USR} --p ${ANCHORE_PSW} image wait ${REPOSITORY}${TAG}
+          ## get the evaluation and wash it through jq.
           anchore-cli --url ${ANCHORE_CLI_URL} --u ${ANCHORE_USR} --p ${ANCHORE_PSW} --json evaluate check --detail ${REPOSITORY}${TAG} | \
-            jq .[] | jq .[] | jq .[] | \
-            jq '.[].detail.result | select ((.final_action=="stop") and (.final_action_reason=="policy_evaluation")) | .result' | \
-            jq -r '.[].result?.rows[] | select (.[6]=="stop" and .[7]==false) | [.[2], .[5]]|@tsv ' > jira_body.txt   
+            jq '.[keys_unsorted[0]] | .[keys_unsorted[0]] | .[keys_unsorted[0]] | .[].detail.result | 
+            select ((.final_action=="stop") and (.final_action_reason=="policy_evaluation")) | .result[].result?.rows[] | 
+            select (.[6]=="stop") | [.[2], .[5]] | @tsv'
+            ##
+            ## this is an extremely ugly jq filter, but I'll try to sort it out:
+            ## the keys_unsorted functions are necessary because we don't know what the keys will
+            ## be, exactly (the first key we have to contend with is the digest, the second is the image
+            ## registry/repo:tag.  Once we get past that we can dive down into detail.result, then 
+            ## only proceed if the final_action is stop AND final_action_reason is policy_evaluation
+            ## (e.g. we won't do anything if the image is blocklisted (this is a personal preference,
+            ## there is a good argument that stop actions in a blocklisted image should still be
+            ## called out and addressed, I just did it this way to illustrate a possibility)).
+            ## Once we clear that hurdle, filter down to the result and only select the rows where 
+            ## Gate_Action (index 6) is "Stop" and for those, output index 2 (Trigger_Id) and 5 
+            ## (Check_Output), and format them as tab seperated values.
+            ##
+            #jq .[] | jq .[] | jq .[] | \
+            #jq '.[].detail.result | select ((.final_action=="stop") and (.final_action_reason=="policy_evaluation")) | .result' | \
+            #jq -r '.[].result?.rows[] | select (.[6]=="stop" and .[7]==false) | [.[2], .[5]]|@tsv ' > jira_body.txt   
         """
       } // end steps
     } // end stage "analyze"
