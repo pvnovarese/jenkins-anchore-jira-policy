@@ -78,7 +78,7 @@ pipeline {
           anchore-cli --url ${ANCHORE_CLI_URL} --u ${ANCHORE_USR} --p ${ANCHORE_PSW} --json evaluate check --detail ${REPOSITORY}${TAG} | \
             jq '.[keys_unsorted[0]] | .[keys_unsorted[0]] | .[keys_unsorted[0]] | .[].detail.result | 
             select ((.final_action=="stop") and (.final_action_reason=="policy_evaluation")) | .result[].result?.rows[] | 
-            select (.[6]=="stop") | [.[2], .[5]] | @tsv'
+            select (.[6]=="stop") | [.[2], .[5]] | @tsv' > jira_body.txt
             ##
             ## this is an extremely ugly jq filter, but I'll try to sort it out:
             ## the keys_unsorted functions are necessary because we don't know what the keys will
@@ -91,6 +91,8 @@ pipeline {
             ## Once we clear that hurdle, filter down to the result and only select the rows where 
             ## Gate_Action (index 6) is "Stop" and for those, output index 2 (Trigger_Id) and 5 
             ## (Check_Output), and format them as tab seperated values.
+            ##
+            ## warning: I am also a jq noob so there's probably a better way to do that 
             ##
             #jq .[] | jq .[] | jq .[] | \
             #jq '.[].detail.result | select ((.final_action=="stop") and (.final_action_reason=="policy_evaluation")) | .result' | \
