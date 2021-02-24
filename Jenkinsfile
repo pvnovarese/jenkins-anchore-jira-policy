@@ -30,8 +30,8 @@ pipeline {
     
     // change repository to your DockerID
     REPOSITORY = "${DOCKER_HUB_USR}/jenkins-anchore-jira-policy"
-    //TAG = ":devbuild-${BUILD_NUMBER}"   
-    TAG = ":scratch1"
+    TAG = ":devbuild-${BUILD_NUMBER}"   
+    //TAG = ":scratch1"
     
     // set path for executables.  I put these in jenkins_home as noted
     // in README but you may install it somewhere else like /usr/local/bin
@@ -48,16 +48,16 @@ pipeline {
       } // end steps
     } // end stage "checkout scm"
     
-    //stage('Build image and tag with build number') {
-    //  steps {
-    //    script {
-    //      dockerImage = docker.build REPOSITORY + TAG
-    //      docker.withRegistry( '', HUB_CREDENTIAL ) { 
-    //        dockerImage.push() 
-    //      }
-    //    } // end script
-    //  } // end steps      
-    //} // end stage "build image and tag w build number"
+    stage('Build image and tag with build number') {
+      steps {
+        script {
+          dockerImage = docker.build REPOSITORY + TAG
+          docker.withRegistry( '', HUB_CREDENTIAL ) { 
+            dockerImage.push() 
+          }
+        } // end script
+      } // end steps      
+    } // end stage "build image and tag w build number"
     
     stage('Analyze with Anchore') {
       steps {
@@ -82,22 +82,25 @@ pipeline {
             select (.[6]=="stop") | [.[2], .[5]] | @tsv' > jira_body.txt
             ##
             ## this is an extremely ugly jq filter, but I'll try to sort it out:
+            ##
+            ## Line 1:
             ## the keys_unsorted functions are necessary because we don't know what the keys will
             ## be, exactly (the first key we have to contend with is the digest, the second is the image
-            ## registry/repo:tag.  Once we get past that we can dive down into detail.result, then 
+            ## registry/repo:tag.  Once we get past that we can dive down into detail.result
+            ##
+            ## Line 2:
             ## only proceed if the final_action is stop AND final_action_reason is policy_evaluation
             ## (e.g. we won't do anything if the image is blocklisted (this is a personal preference,
             ## there is a good argument that stop actions in a blocklisted image should still be
             ## called out and addressed, I just did it this way to illustrate a possibility)).
-            ## Once we clear that hurdle, filter down to the result and only select the rows where 
-            ## Gate_Action (index 6) is "Stop" and for those, output index 2 (Trigger_Id) and 5 
-            ## (Check_Output), and format them as tab seperated values.
+            ## Once we clear that hurdle, filter down to the result 
+            ## 
+            ## Line 3:
+            ## only select rows where Gate_Action (index 6) is "Stop" and for those, output index 2 
+            ## (Trigger_Id) and 5 (Check_Output), and format them as tab seperated values.
             ##
             ## warning: I am also a jq noob so there's probably a better way to do that 
             ##
-            #jq .[] | jq .[] | jq .[] | \
-            #jq '.[].detail.result | select ((.final_action=="stop") and (.final_action_reason=="policy_evaluation")) | .result' | \
-            #jq -r '.[].result?.rows[] | select (.[6]=="stop" and .[7]==false) | [.[2], .[5]]|@tsv ' > jira_body.txt   
         """
       } // end steps
     } // end stage "analyze"
@@ -106,19 +109,19 @@ pipeline {
       steps {       
         script {
           DESC_BODY_LINES = sh (
-            script: 'cat jira_body.txt | wc -l',
+            script: 'cat xxx_jira_body.txt | wc -l',
             returnStdout: true
           ).trim()
           if (DESC_BODY_LINES != '0') {
             sh """
               # build json for jira API
-              echo '{ "fields": { "project": { "id": "${JIRA_PROJECT}" }, "issuetype": { "id": "${JIRA_ISSUETYPE}" }, "summary": "Anchore detected policy violations", "reporter": { "id": "${JIRA_ASSIGNEE}" }, "labels": [ "anchore" ], "assignee": { "id": "${JIRA_ASSIGNEE}" }, "description": "' | head -c -1 > jira_header.txt
-              echo '${REPOSITORY}${TAG} has STOP action policy violations:' >> jira_header.txt
-              echo >> jira_header.txt
-              cat jira_header.txt jira_body.txt | sed -e :a -e '\$!N;s/\\n/\\\\n/;ta' | tr '\\t' '  ' | tr -d '\\\n' > v2_create_issue.json  # escape newlines, convert tabs to spaces, remove any remaining newlines
-              echo '" } }' >> v2_create_issue.json # this just closes the json
+              echo '{ "fields": { "project": { "id": "${JIRA_PROJECT}" }, "issuetype": { "id": "${JIRA_ISSUETYPE}" }, "summary": "Anchore detected policy violations", "reporter": { "id": "${JIRA_ASSIGNEE}" }, "labels": [ "anchore" ], "assignee": { "id": "${JIRA_ASSIGNEE}" }, "description": "' | head -c -1 > xxx_jira_header.txt
+              echo '${REPOSITORY}${TAG} has STOP action policy violations:' >> xxx_jira_header.txt
+              echo >> xxx_jira_header.txt
+              cat xxx_jira_header.txt xxx_jira_body.txt | sed -e :a -e '\$!N;s/\\n/\\\\n/;ta' | tr '\\t' '  ' | tr -d '\\\n' > xxx_jira_v2_payload.json  # escape newlines, convert tabs to spaces, remove any remaining newlines
+              echo '" } }' >> xxx_jira_v2_payload.json # this just closes the json
               echo "opening jira ticket"
-              cat v2_create_issue.json | curl --data-binary @- --request POST --url 'https://${JIRA_URL}/rest/api/2/issue' --user '${JIRA_USR}:${JIRA_PSW}'  --header 'Accept: application/json' --header 'Content-Type: application/json'
+              cat xxx_jira_v2_payload.json | curl --data-binary @- --request POST --url 'https://${JIRA_URL}/rest/api/2/issue' --user '${JIRA_USR}:${JIRA_PSW}'  --header 'Accept: application/json' --header 'Content-Type: application/json'
             """
           } else {
             echo "no problems detected"
@@ -143,9 +146,7 @@ pipeline {
     stage('Clean up') {
       // delete the images locally
       steps {
-        sh """
-          docker rmi ${REPOSITORY}${TAG}
-        """
+        sh 'docker rmi ${REPOSITORY}${TAG}'
         // ${REPOSITORY}:prod'
       } // end steps
     } // end stage "clean up"
