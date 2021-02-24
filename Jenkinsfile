@@ -79,7 +79,7 @@ pipeline {
           anchore-cli --url ${ANCHORE_CLI_URL} --u ${ANCHORE_USR} --p ${ANCHORE_PSW} --json evaluate check --detail ${REPOSITORY}${TAG} | \
             jq -r '.[keys_unsorted[0]] | .[keys_unsorted[0]] | .[keys_unsorted[0]] | .[].detail.result | 
             select ((.final_action=="stop") and (.final_action_reason=="policy_evaluation")) | .result[].result?.rows[] | 
-            select (.[6]=="stop") | [.[2], .[5]] | @tsv' > jira_body.txt
+            select (.[6]=="stop") | [.[2], .[5]] | @tsv' > xxx_jira_body.txt
             ##
             ## this is an extremely ugly jq filter, but I'll try to sort it out:
             ##
